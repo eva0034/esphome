@@ -40,6 +40,8 @@ CONF_TIME_STAMP = "timestamp"
 CONF_PULSES = "pulses"
 CONF_COST = "cost"
 CONF_DAILY_PULSES = "daily_pulses"
+CONF_COST_PER_KWH_ON_PEAK = "cost_per_kwh_on_peak"
+CONF_COST_PER_KWH_OFF_PEAK = "cost_per_kwh_off_peak"
 
 def _validate(config):
     if CONF_DAILY_ENERGY in config and CONF_TIME_ID not in config:
@@ -87,58 +89,49 @@ def powerpal_apikey(value):
 
 
 CONFIG_SCHEMA = cv.All(
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.declare_id(Powerpal),
-            cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
-            cv.Optional(CONF_POWER): sensor.sensor_schema(
-                unit_of_measurement=UNIT_WATT,
-                accuracy_decimals=0,
-                device_class=DEVICE_CLASS_POWER,
-                state_class=STATE_CLASS_MEASUREMENT,
-            ),
-            cv.Optional(CONF_DAILY_ENERGY): sensor.sensor_schema(
-                unit_of_measurement=UNIT_KILOWATT_HOURS,
-                accuracy_decimals=3,
-                device_class=DEVICE_CLASS_ENERGY,
-                state_class=STATE_CLASS_TOTAL_INCREASING,
-
-            ),
-            cv.Optional(CONF_ENERGY): sensor.sensor_schema(
-                unit_of_measurement=UNIT_KILOWATT_HOURS,
-                accuracy_decimals=3,
-                device_class=DEVICE_CLASS_ENERGY,
-                state_class=STATE_CLASS_TOTAL_INCREASING,
-            ),
-            cv.Optional(CONF_WATT_HOURS): sensor.sensor_schema(),
-            cv.Optional(CONF_PULSES): sensor.sensor_schema(),
-            cv.Optional(CONF_DAILY_PULSES): sensor.sensor_schema(),
-            cv.Optional(CONF_TIME_STAMP): sensor.sensor_schema(),
-            cv.Optional(CONF_COST): sensor.sensor_schema(
-                accuracy_decimals=11
-            ),
-            cv.Required(CONF_PAIRING_CODE): cv.int_range(min=1, max=999999),
-            cv.Required(CONF_NOTIFICATION_INTERVAL): cv.int_range(min=1, max=60),
-            cv.Required(CONF_PULSES_PER_KWH): cv.float_range(min=1),
-            cv.Optional(CONF_BATTERY_LEVEL): sensor.sensor_schema(
-                unit_of_measurement=UNIT_PERCENT,
-                device_class=DEVICE_CLASS_BATTERY,
-                accuracy_decimals=0,
-                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
-            ),
-            cv.Optional(CONF_COST_PER_KWH): cv.float_range(min=0),
-            cv.Optional(
-                CONF_POWERPAL_DEVICE_ID
-            ): powerpal_deviceid,  # deviceid (optional) # if not configured, will grab from device
-            cv.Optional(
-                CONF_POWERPAL_APIKEY
-            ): powerpal_apikey,  # apikey (optional) # if not configured, will grab from device
-            # upload interval (optional)
-            # action to enable or disable peak
-        }
-    )
-    .extend(ble_client.BLE_CLIENT_SCHEMA)
-    .extend(cv.COMPONENT_SCHEMA),
+    cv.Schema({
+        cv.GenerateID(): cv.declare_id(Powerpal),
+        cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
+        cv.Optional(CONF_POWER): sensor.sensor_schema(
+            unit_of_measurement=UNIT_WATT,
+            accuracy_decimals=0,
+            device_class=DEVICE_CLASS_POWER,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_DAILY_ENERGY): sensor.sensor_schema(
+            unit_of_measurement=UNIT_KILOWATT_HOURS,
+            accuracy_decimals=3,
+            device_class=DEVICE_CLASS_ENERGY,
+            state_class=STATE_CLASS_TOTAL_INCREASING,
+        ),
+        cv.Optional(CONF_ENERGY): sensor.sensor_schema(
+            unit_of_measurement=UNIT_KILOWATT_HOURS,
+            accuracy_decimals=3,
+            device_class=DEVICE_CLASS_ENERGY,
+            state_class=STATE_CLASS_TOTAL_INCREASING,
+        ),
+        cv.Optional(CONF_WATT_HOURS): sensor.sensor_schema(),
+        cv.Optional(CONF_PULSES): sensor.sensor_schema(),
+        cv.Optional(CONF_DAILY_PULSES): sensor.sensor_schema(),
+        cv.Optional(CONF_TIME_STAMP): sensor.sensor_schema(),
+        cv.Optional(CONF_COST): sensor.sensor_schema(
+            accuracy_decimals=11,
+        ),
+        cv.Required(CONF_PAIRING_CODE): cv.int_range(min=1, max=999999),
+        cv.Required(CONF_NOTIFICATION_INTERVAL): cv.int_range(min=1, max=60),
+        cv.Required(CONF_PULSES_PER_KWH): cv.float_range(min=1),
+        cv.Optional(CONF_BATTERY_LEVEL): sensor.sensor_schema(
+            unit_of_measurement=UNIT_PERCENT,
+            device_class=DEVICE_CLASS_BATTERY,
+            accuracy_decimals=0,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_COST_PER_KWH): cv.float_range(min=0),
+        cv.Optional(CONF_COST_PER_KWH_ON_PEAK): cv.float_range(min=0),
+        cv.Optional(CONF_COST_PER_KWH_OFF_PEAK): cv.float_range(min=0),
+        cv.Optional(CONF_POWERPAL_DEVICE_ID): cv.string,
+        cv.Optional(CONF_POWERPAL_APIKEY): cv.string,
+    }).extend(ble_client.BLE_CLIENT_SCHEMA).extend(cv.COMPONENT_SCHEMA),
     _validate,
 )
 
@@ -192,10 +185,15 @@ async def to_code(config):
         sens = await sensor.new_sensor(config[CONF_BATTERY_LEVEL])
         cg.add(var.set_battery(sens))
 
-
     if CONF_COST_PER_KWH in config:
         cg.add(var.set_energy_cost(config[CONF_COST_PER_KWH]))
 
+    if CONF_COST_PER_KWH_ON_PEAK in config:
+        cg.add(var.set_cost_per_kwh_on_peak(config[CONF_COST_PER_KWH_ON_PEAK]))
+
+    if CONF_COST_PER_KWH_OFF_PEAK in config:
+        cg.add(var.set_cost_per_kwh_off_peak(config[CONF_COST_PER_KWH_OFF_PEAK]))
+        
     if CONF_POWERPAL_DEVICE_ID in config:
         cg.add(var.set_device_id(config[CONF_POWERPAL_DEVICE_ID]))
 

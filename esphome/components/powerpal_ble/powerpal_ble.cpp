@@ -23,6 +23,9 @@ void Powerpal::setup() {
   ESP_LOGI(TAG, "pulse_multiplier_: %f", this->pulse_multiplier_ );
 }
 
+void Powerpal::set_time(esphome::time::RealTimeClock* time) {
+    this->time_ = time;
+}
 
 std::string Powerpal::pkt_to_hex_(const uint8_t *data, uint16_t len) {
   char buf[64];
@@ -396,6 +399,28 @@ void Powerpal::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gat
     default:
       break;
   }
+}
+
+float Powerpal::get_current_cost_per_kwh() {
+#ifdef USE_TIME
+    if (this->time_ && this->time_.value()->now().is_valid()) {
+        auto now = this->time_.value()->now();
+        if (now.hour >= 15 && now.hour < 21) {
+            return this->cost_per_kwh_on_peak_;
+        }
+    }
+    return this->cost_per_kwh_off_peak_;
+#else
+    return this->cost_per_kwh_off_peak_;
+#endif
+}
+
+void Powerpal::set_cost_per_kwh_on_peak(float cost) {
+  this->cost_per_kwh_on_peak_ = cost;
+}
+
+void Powerpal::set_cost_per_kwh_off_peak(float cost) {
+  this->cost_per_kwh_off_peak_ = cost;
 }
 
 void Powerpal::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {

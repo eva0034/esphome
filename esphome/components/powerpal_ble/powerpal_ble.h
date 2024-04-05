@@ -6,12 +6,7 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/core/defines.h"
 #include "esphome/core/helpers.h"
-
-#ifdef USE_TIME
 #include "esphome/components/time/real_time_clock.h"
-#else
-#include <ctime>
-#endif
 
 #ifdef USE_ESP32
 
@@ -64,6 +59,8 @@ class Powerpal : public esphome::ble_client::BLEClientNode, public Component {
   void dump_config() override;
   // float get_setup_priority() const override { return setup_priority::DATA; }
   float get_setup_priority() const override { return setup_priority::AFTER_WIFI; }
+  void set_cost_per_kwh_on_peak(float cost);
+  void set_cost_per_kwh_off_peak(float cost);
   void set_battery(sensor::Sensor *battery) { battery_ = battery; }
   void set_power_sensor(sensor::Sensor *power_sensor) { power_sensor_ = power_sensor; }
   void set_energy_sensor(sensor::Sensor *energy_sensor) { energy_sensor_ = energy_sensor; }
@@ -73,9 +70,8 @@ class Powerpal : public esphome::ble_client::BLEClientNode, public Component {
   void set_watt_hours(sensor::Sensor *watt_hours_sensor) {watt_hours_sensor_ = watt_hours_sensor;}
   void set_timestamp(sensor::Sensor *timestamp_sensor) { timestamp_sensor_ = timestamp_sensor;}
   void set_daily_pulses_sensor(sensor::Sensor *daily_pulses_sensor) { daily_pulses_sensor_ = daily_pulses_sensor;}
-#ifdef USE_TIME
-  void set_time(time::RealTimeClock *time) { time_ = time; }
-#endif
+  float get_current_cost_per_kwh();
+  void set_time(esphome::time::RealTimeClock *time);
   void set_pulses_per_kwh(float pulses_per_kwh) { pulses_per_kwh_ = pulses_per_kwh; }
   void set_pairing_code(uint32_t pairing_code) {
     pairing_code_[0] = (pairing_code & 0x000000FF);
@@ -94,10 +90,10 @@ class Powerpal : public esphome::ble_client::BLEClientNode, public Component {
   void decode_(const uint8_t *data, uint16_t length);
   void parse_battery_(const uint8_t *data, uint16_t length);
   void parse_measurement_(const uint8_t *data, uint16_t length);
- 
+  float cost_per_kwh_on_peak_{0.0};
+  float cost_per_kwh_off_peak_{0.0};
   std::string uuid_to_device_id_(const uint8_t *data, uint16_t length);
   std::string serial_to_apikey_(const uint8_t *data, uint16_t length);
-
 
   bool authenticated_;
 
@@ -110,11 +106,9 @@ class Powerpal : public esphome::ble_client::BLEClientNode, public Component {
   sensor::Sensor *daily_pulses_sensor_{nullptr};
   sensor::Sensor *watt_hours_sensor_{nullptr};
   sensor::Sensor *timestamp_sensor_{nullptr};
- 
 
-#ifdef USE_TIME
   optional<time::RealTimeClock *> time_{};
-#endif
+  
   uint16_t day_of_last_measurement_{0};
 
   uint8_t pairing_code_[4];
